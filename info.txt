@@ -1,1 +1,4 @@
 this repo is for machine learning pipelines train to calculate length, widht or any other dimennsion in future 
+
+
+--- the venv for length model pipeline is name .venv and it has python version 3.10.0
