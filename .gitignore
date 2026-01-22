@@ -1,3 +1,22 @@
 .idea/
 .venv/
+# Resources / data / artifacts
 resources/
+data/
+datasets/
+artifacts/
+
+# Models
+*.pkl
+*.joblib
+*.pt
+*.h5
+*.onnx
+
+# Large data
+*.csv
+*.html
+
+# Python cache
+__pycache__/
+*.pyc
