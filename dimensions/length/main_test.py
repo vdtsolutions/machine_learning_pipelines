@@ -9,12 +9,21 @@
 # REF_ID_COL   = "S.No"
 # REF_DIST_COL = "absolute_distance"
 # REF_ORI_COL  = "orientation"
-# REF_LEN_COL  = "length"
 #
 # TEST_ID_COL   = "id"
 # TEST_DIST_COL = "absolute_distance"
 # TEST_ORI_COL  = "orientation"
-# TEST_LEN_COL  = "length"
+#
+# # 🔥 PARAMETERS TO EVALUATE (CHANGE THIS ONLY)
+# PARAMS_TO_EVALUATE = ["length"]
+# # Example: ["length"], ["depth"], ["width"], ["length","depth"]
+#
+# # Column mapping: param_name -> (REF_COL, TEST_COL)
+# PARAM_COLUMN_MAP = {
+#     "length": ("length", "length"),
+#     "depth":  ("Depth",  "depth"),
+#     "width":  ("Width",  "width_new2")
+# }
 #
 # DIST_THRESHOLD_MM = 110
 # ORI_THRESHOLD_MIN = 80
@@ -48,15 +57,14 @@
 # # ---------- Load CSVs ---------- #
 #
 # print("\n[INFO] Loading reference CSV...")
-# ref = pd.read_csv(REF_FILE)[[REF_ID_COL, REF_DIST_COL, REF_ORI_COL, REF_LEN_COL]]
+# ref = pd.read_csv(REF_FILE)
 #
 # print("\n[INFO] Loading test CSV...")
-# test = pd.read_csv(TEST_FILE)[[TEST_ID_COL, TEST_DIST_COL, TEST_ORI_COL, TEST_LEN_COL]]
+# test = pd.read_csv(TEST_FILE)
 #
 #
-# # ---------- NaN & Type Fix (ONLY ADDITION) ---------- #
+# # ---------- Force numeric distance ---------- #
 #
-# # Force distance to numeric (convert garbage strings to NaN)
 # test[TEST_DIST_COL] = pd.to_numeric(test[TEST_DIST_COL], errors="coerce")
 # ref[REF_DIST_COL]   = pd.to_numeric(ref[REF_DIST_COL], errors="coerce")
 #
@@ -67,7 +75,7 @@
 # ref["dist_mm"]  = ref[REF_DIST_COL]  * 1000 if REF_DISTANCE_IN_METERS  else ref[REF_DIST_COL]
 #
 #
-# # ---------- Drop corrupt rows (ONLY ADDITION) ---------- #
+# # ---------- Drop corrupt rows ---------- #
 #
 # test = test.dropna(subset=["dist_mm"])
 # test = test[test["dist_mm"] > 0]
@@ -88,7 +96,7 @@
 # test = test.sort_values("dist_mm").reset_index(drop=True)
 #
 #
-# # ---------- Matching ---------- #
+# # ---------- MATCHING ---------- #
 #
 # results = []
 #
@@ -97,10 +105,10 @@
 # for _, t in test.iterrows():
 #
 #     print("\n" + "="*120)
-#     print(f"[TEST] ID={t[TEST_ID_COL]} | dist={t['dist_mm']:.2f} mm | ori={t[TEST_ORI_COL]} | len={t[TEST_LEN_COL]}")
+#     print(f"[TEST] ID={t[TEST_ID_COL]} | dist={t['dist_mm']:.2f} mm | ori={t[TEST_ORI_COL]}")
 #     print("="*120)
 #
-#     matched_refs = []   # store ALL matching refs
+#     matched_refs = []
 #
 #     for ri, r in ref.iterrows():
 #
@@ -111,7 +119,6 @@
 #         # Orientation check
 #         ori_diff = None
 #         ori_pass = True
-#
 #         if not np.isnan(r["ori_min"]) and not np.isnan(t["ori_min"]):
 #             ori_diff = circular_diff(r["ori_min"], t["ori_min"])
 #             ori_pass = ori_diff <= ORI_THRESHOLD_MIN + border_threshold_limit
@@ -126,41 +133,54 @@
 #             continue
 #
 #         print("        >>> VALID MATCH")
+#
+#         # Collect dynamic actual parameters
+#         actual_params = {}
+#         for p in PARAMS_TO_EVALUATE:
+#             ref_col, _ = PARAM_COLUMN_MAP[p]
+#             actual_params[p] = r.get(ref_col, np.nan)
+#
 #         matched_refs.append({
 #             "ref_id": r[REF_ID_COL],
 #             "dist_diff": dist_diff,
 #             "ori_diff": ori_diff,
-#             "actual_len": r[REF_LEN_COL]
+#             "actual_params": actual_params
 #         })
 #
-#     # ---------- Store Results ---------- #
+#
+#     # ---------- Select Best Match ---------- #
 #
 #     if matched_refs:
 #         matched = "YES"
 #         ref_ids = [m["ref_id"] for m in matched_refs]
-#         best_match = min(matched_refs, key=lambda x: x["dist_diff"])  # closest one
-#
-#         print(f"\n>>> MATCHED REF IDs: {ref_ids}")
-#         print(f"    BEST REF = {best_match['ref_id']} | DistDiff={best_match['dist_diff']} | OriDiff={best_match['ori_diff']}")
-#
+#         best_match = min(matched_refs, key=lambda x: x["dist_diff"])
 #     else:
 #         matched = "NO"
 #         ref_ids = []
-#         best_match = {"actual_len": np.nan}
+#         best_match = {"ref_id": np.nan, "actual_params": {}}
 #
 #         print("\n>>> NO MATCH FOUND")
 #
-#     results.append({
+#
+#     # ---------- Store Results ---------- #
+#
+#     result_row = {
 #         "id": t[TEST_ID_COL],
-#         "ref_ids_all": ",".join(map(str, ref_ids)),   # all matches
+#         "ref_ids_all": ",".join(map(str, ref_ids)),
 #         "best_ref_id": best_match.get("ref_id", np.nan),
 #         "distance_mm": t["dist_mm"],
 #         "orientation": t[TEST_ORI_COL],
-#         "pred_length": t[TEST_LEN_COL],
-#         "actual_length_best": best_match["actual_len"],
 #         "matched": matched,
 #         "num_matches": len(ref_ids)
-#     })
+#     }
+#
+#     # Add predicted & actual params dynamically
+#     for p in PARAMS_TO_EVALUATE:
+#         _, test_col = PARAM_COLUMN_MAP[p]
+#         result_row[f"pred_{p}"]   = t.get(test_col, np.nan)
+#         result_row[f"actual_{p}"] = best_match.get("actual_params", {}).get(p, np.nan)
+#
+#     results.append(result_row)
 #
 #
 # # ---------- Save Outputs ---------- #
@@ -173,6 +193,7 @@
 # print("Matched:", (out_df["matched"] == "YES").sum())
 # print("Unmatched:", (out_df["matched"] == "NO").sum())
 # print("Saved → multi_matching_results.csv")
+
 
 import pandas as pd
 import numpy as np
@@ -196,7 +217,7 @@ PARAMS_TO_EVALUATE = ["length"]
 
 # Column mapping: param_name -> (REF_COL, TEST_COL)
 PARAM_COLUMN_MAP = {
-    "length": ("length", "length"),
+    "length": ("length", "length_percent"),
     "depth":  ("Depth",  "depth"),
     "width":  ("Width",  "width_new2")
 }
@@ -353,8 +374,16 @@ for _, t in test.iterrows():
     # Add predicted & actual params dynamically
     for p in PARAMS_TO_EVALUATE:
         _, test_col = PARAM_COLUMN_MAP[p]
-        result_row[f"pred_{p}"]   = t.get(test_col, np.nan)
-        result_row[f"actual_{p}"] = best_match.get("actual_params", {}).get(p, np.nan)
+
+        # predicted
+        result_row[f"pred_{p}"] = t.get(test_col, np.nan)
+
+        # best matched GT
+        result_row[f"actual_{p}_best"] = best_match.get("actual_params", {}).get(p, np.nan)
+
+        # ALL matched GT values
+        all_actual_values = [str(m["actual_params"].get(p, np.nan)) for m in matched_refs]
+        result_row[f"actual_{p}_all"] = ",".join(all_actual_values)
 
     results.append(result_row)
 

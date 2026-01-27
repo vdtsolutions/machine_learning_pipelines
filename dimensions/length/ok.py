@@ -1,5 +1,3 @@
-
-
 import pandas as pd
 import numpy as np
 
@@ -16,17 +14,6 @@ TEST_ID_COL   = "id"
 TEST_DIST_COL = "absolute_distance"
 TEST_ORI_COL  = "orientation"
 
-# 🔥 PARAMETERS TO EVALUATE (CHANGE THIS ONLY)
-PARAMS_TO_EVALUATE = ["length"]
-# Example: ["length"], ["depth"], ["width"], ["length","depth"]
-
-# Column mapping: param_name -> (REF_COL, TEST_COL)
-PARAM_COLUMN_MAP = {
-    "length": ("length", "length_percent"),
-    "depth":  ("Depth",  "depth"),
-    "width":  ("Width",  "width_new2")
-}
-
 DIST_THRESHOLD_MM = 110
 ORI_THRESHOLD_MIN = 80
 border_threshold_limit = 10
@@ -34,10 +21,9 @@ border_threshold_limit = 10
 TEST_DISTANCE_IN_METERS = True
 REF_DISTANCE_IN_METERS  = False
 
+DIST_TOL = 5  # dedup distance tolerance
+
 # ========================================= #
-
-
-# ---------- Helpers ---------- #
 
 def orientation_to_minutes(x):
     if pd.isna(x):
@@ -51,210 +37,194 @@ def orientation_to_minutes(x):
     except:
         return np.nan
 
-
 def circular_diff(a, b, max_val=720):
     return min(abs(a - b), max_val - abs(a - b))
 
-
 # ---------- Load ---------- #
 
-print("[INFO] Loading CSVs...")
 ref  = pd.read_csv(REF_FILE)
 test = pd.read_csv(TEST_FILE)
 
-# Force numeric
 test[TEST_DIST_COL] = pd.to_numeric(test[TEST_DIST_COL], errors="coerce")
 ref[REF_DIST_COL]   = pd.to_numeric(ref[REF_DIST_COL], errors="coerce")
 
-# Unit conversion
 test["dist_mm"] = test[TEST_DIST_COL] * 1000 if TEST_DISTANCE_IN_METERS else test[TEST_DIST_COL]
 ref["dist_mm"]  = ref[REF_DIST_COL]  * 1000 if REF_DISTANCE_IN_METERS  else ref[REF_DIST_COL]
 
-# Drop bad rows
 test = test.dropna(subset=["dist_mm"])
-test = test[test["dist_mm"] > 0]
 ref  = ref.dropna(subset=["dist_mm"])
+
+test = test[test["dist_mm"] > 0]
 ref  = ref[ref["dist_mm"] > 0]
 
-# Orientation
 ref["ori_min"]  = ref[REF_ORI_COL].apply(orientation_to_minutes)
 test["ori_min"] = test[TEST_ORI_COL].apply(orientation_to_minutes)
 
-# Sort
 ref  = ref.sort_values("dist_mm").reset_index(drop=True)
 test = test.sort_values("dist_mm").reset_index(drop=True)
 
-# ================= MULTI MATCHING ================= #
+# ================= BUILD MATCH TABLE ================= #
 
 results = []
 
-print("\n================ MULTI MATCHING DEBUG START ================\n")
-
 for _, t in test.iterrows():
-
-    print("\n" + "="*140)
-    print(f"[TEST] ID={t[TEST_ID_COL]} | dist={t['dist_mm']:.2f} mm | ori={t[TEST_ORI_COL]}")
-    print("="*140)
-
+    tid = int(t[TEST_ID_COL])
     matched_refs = []
 
-    for ri, r in ref.iterrows():
-
+    for _, r in ref.iterrows():
         dist_diff = abs(r["dist_mm"] - t["dist_mm"])
         dist_pass = dist_diff <= DIST_THRESHOLD_MM
 
-        ori_diff = None
         ori_pass = True
+        ori_diff = None
         if not np.isnan(r["ori_min"]) and not np.isnan(t["ori_min"]):
             ori_diff = circular_diff(r["ori_min"], t["ori_min"])
             ori_pass = ori_diff <= ORI_THRESHOLD_MIN + border_threshold_limit
 
-        print(
-            f"[REF idx={ri} | REF_ID={r[REF_ID_COL]}] "
-            f"ref_dist={r['dist_mm']:.2f} | ref_ori={r[REF_ORI_COL]} | "
-            f"dist_diff={dist_diff:.2f} | ori_diff={ori_diff} "
-            f"=> DIST_{'OK' if dist_pass else 'FAIL'} & ORI_{'OK' if ori_pass else 'FAIL'}"
-        )
-
-        if not dist_pass or not ori_pass:
-            continue
-
-        print("        >>> VALID MATCH")
-
-        matched_refs.append({
-            "ref_id": r[REF_ID_COL],
-            "dist_diff": dist_diff,
-            "ori_diff": ori_diff,
-            "ref_length": r["length"]
-        })
-
-    if matched_refs:
-        matched = "YES"
-    else:
-        matched = "NO"
-        print(">>> NO MATCH FOUND")
+        if dist_pass and ori_pass:
+            matched_refs.append({
+                "ref_id": int(r[REF_ID_COL]),
+                "dist_diff": dist_diff,
+                "ori_diff": ori_diff if ori_diff is not None else 0,
+                "ref_length": r["length"]
+            })
 
     row = {
-        "id": t[TEST_ID_COL],
+        "id": tid,
+        "distance_mm": t["dist_mm"],
+        "orientation": t[TEST_ORI_COL],
+        "pred_length": t["length_percent"],
         "ref_ids_all": ",".join(str(m["ref_id"]) for m in matched_refs),
         "ref_lengths_all": ",".join(str(m["ref_length"]) for m in matched_refs),
         "dist_diffs_all": ",".join(str(m["dist_diff"]) for m in matched_refs),
         "ori_diffs_all": ",".join(str(m["ori_diff"]) for m in matched_refs),
-        "distance_mm": t["dist_mm"],
-        "orientation": t[TEST_ORI_COL],
-        "matched": matched,
-        "num_matches": len(matched_refs),
-        "pred_length": t["length_percent"]
+        "matched": "YES" if matched_refs else "NO",
+        "num_matches": len(matched_refs)
     }
-
     results.append(row)
 
 out_df = pd.DataFrame(results)
 
-# ================= GLOBAL FILTERING USING ref_ids_all ================= #
+# ================= EXPLODE ================= #
 
-print("\n================ GLOBAL FILTERING DEBUG (REAL SCORING) ================\n")
-
-# Clean strings
 for c in ["ref_ids_all","ref_lengths_all","dist_diffs_all","ori_diffs_all"]:
     out_df[c] = out_df[c].astype(str).str.replace(" ", "")
 
-# Explode all aligned columns
 temp = out_df.copy()
 for c in ["ref_ids_all","ref_lengths_all","dist_diffs_all","ori_diffs_all"]:
     temp[c] = temp[c].str.split(",")
 
 temp = temp.explode(["ref_ids_all","ref_lengths_all","dist_diffs_all","ori_diffs_all"])
 temp.to_csv("PAIRING_TABLE.csv", index=False)
-print("Saved PAIRING_TABLE.csv")
 
+# numeric
+for c in ["ref_ids_all","ref_lengths_all","dist_diffs_all","ori_diffs_all","pred_length"]:
+    temp[c] = pd.to_numeric(temp[c], errors="coerce")
 
-# Convert numeric
-temp["ref_ids_all"]   = pd.to_numeric(temp["ref_ids_all"], errors="coerce")
-temp["ref_lengths_all"] = pd.to_numeric(temp["ref_lengths_all"], errors="coerce")
-temp["dist_diffs_all"]  = pd.to_numeric(temp["dist_diffs_all"], errors="coerce")
-temp["ori_diffs_all"]   = pd.to_numeric(temp["ori_diffs_all"], errors="coerce")
-temp["dist_diffs_all"]  = pd.to_numeric(temp["dist_diffs_all"], errors="coerce")
-
-# HARD NaN FIX
 temp["ori_diffs_all"]  = temp["ori_diffs_all"].fillna(0)
 temp["dist_diffs_all"] = temp["dist_diffs_all"].fillna(0)
-
-temp["pred_length"]     = pd.to_numeric(temp["pred_length"], errors="coerce")
-
 temp = temp.dropna(subset=["ref_ids_all"])
 
-# Real scoring
-temp["len_error"] = abs(temp["pred_length"] - temp["ref_lengths_all"])
-temp["dist_error"] = temp["dist_diffs_all"]
-temp["ori_error"]  = temp["ori_diffs_all"].fillna(0)
+# ================= SCORING ================= #
 
-# weights
-# W_LEN = 0.6
-# W_DIST = 0.3
-# W_ORI = 0.1
-#
-# temp["score"] = W_LEN*temp["len_error"] + W_DIST*temp["dist_error"] + W_ORI*temp["ori_error"]
+temp["len_error"] = abs(temp["pred_length"] - temp["ref_lengths_all"])
 temp["score"] = temp["len_error"]
 
+# ================= CORRECT GREEDY ASSIGNMENT ================= #
 
-temp = temp.sort_values("score")
-
-# Greedy bipartite assignment
-assigned_test = set()
-assigned_ref  = set()
+assigned_ref = set()
 final_matches = []
+assign_log = {}
 
-print("\n=========== CANDIDATE MATCH TABLE (TOP 50) ===========")
-print(temp[["id","ref_ids_all","pred_length","ref_lengths_all","len_error","dist_error","ori_error","score"]].head(50))
+# IMPORTANT: process test IDs in spatial order
+for t in out_df.sort_values("distance_mm")["id"].unique():
 
-print("\n=========== ASSIGNMENT TRACE ===========")
+    candidates = temp[temp["id"] == t].sort_values("score")
 
-for _, row in temp.iterrows():
-    t = int(row["id"])
-    r = int(row["ref_ids_all"])
-    s = row["score"]
+    for _, row in candidates.iterrows():
+        r = int(row["ref_ids_all"])
+        s = row["score"]
 
-    if t in assigned_test or r in assigned_ref:
-        print(f"SKIP TEST={t} REF={r}")
-        continue
+        if r in assigned_ref:
+            assign_log.setdefault(t, []).append(f"REF {r} TAKEN")
+            continue
 
-    print(f"ASSIGN TEST={t} --> REF={r} | score={s:.3f}")
-    assigned_test.add(t)
-    assigned_ref.add(r)
-    final_matches.append((t, r, s))
+        print(f"[TEST {t}] ASSIGN --> REF {r} | len_error={s:.3f}")
+        assigned_ref.add(r)
+        final_matches.append((t, r, s))
+        assign_log.setdefault(t, []).append(f"ASSIGNED REF {r}")
+        break
 
-# Write back
+# write back
 out_df["filtered_ids"] = np.nan
+out_df["assign_debug"] = ""
+
 for t, r, s in final_matches:
     out_df.loc[out_df["id"] == t, "filtered_ids"] = r
 
+for tid, logs in assign_log.items():
+    out_df.loc[out_df["id"] == tid, "assign_debug"] = " | ".join(logs)
 
-# ================= FINAL DEBUG TRACE ================= #
+# ================= CORRECT DEDUP (ONLY ON ASSIGNED REF) ================= #
 
-print("\n================ FINAL TRACE (TEST-ID ORDER) ================\n")
+print("\n=========== DEDUP DEBUG ===========")
+
+for ref_id, group in out_df.groupby("filtered_ids"):
+
+    if pd.isna(ref_id) or len(group) <= 1:
+        continue
+
+    group = group.sort_values("distance_mm").copy()
+    group["dist_cluster"] = (group["distance_mm"].diff().abs() > DIST_TOL).cumsum()
+
+    for _, cluster in group.groupby("dist_cluster"):
+
+        if len(cluster) <= 1:
+            continue
+
+        best_idx = cluster["pred_length"].idxmin()  # or len_error if stored
+        drop_idx = cluster.index.difference([best_idx])
+
+        print(f"[DEDUP] REF={ref_id} KEEP TEST={out_df.loc[best_idx,'id']} DROP={list(out_df.loc[drop_idx,'id'])}")
+
+        for di in drop_idx:
+            tid = out_df.loc[di,"id"]
+            out_df.loc[di,"assign_debug"] += " | DEDUP_REMOVED"
+            out_df.loc[di,"filtered_ids"] = np.nan
+
+# ================= FINAL TRACE ================= #
+
+print("\n=========== FINAL TRACE ===========")
 
 for _, row in out_df.sort_values("id").iterrows():
     print(
         f"TEST_ID={int(row['id']):03d} | "
-        f"matched={row['matched']} | "
-        f"ref_ids_all={row['ref_ids_all']} | "
         f"filtered={row['filtered_ids']} | "
         f"pred_len={row['pred_length']} | "
         f"dist={row['distance_mm']} | "
-        f"ori={row['orientation']}"
+        f"DEBUG={row['assign_debug']}"
     )
 
-# Safety check
+# safety
 dups = out_df["filtered_ids"].dropna().duplicated().sum()
 print("\nDUPLICATE FILTERED IDS =", dups)
 assert dups == 0, "🔥 DUPLICATE filtered_ids FOUND"
 
-# Save
+# reorder cols
+cols = [c for c in out_df.columns if c != "filtered_ids"] + ["filtered_ids"]
+out_df = out_df[cols]
+
 out_df.to_csv("multi_matching_results_REAL.csv", index=False)
 
-print("\n================ SUMMARY ================")
+print("\n=========== SUMMARY ===========")
 print("Total test defects:", len(test))
 print("Matched:", (out_df["matched"]=="YES").sum())
 print("Filtered unique IDs:", out_df["filtered_ids"].notna().sum())
-print("Saved → multi_matching_results_REAL.csv")
+print("Saved → multi_matchingL.csv")
+
+import os
+print("CSV SAVED AT:", os.path.abspath("multi_matchingL.csv"))
+import os
+print("FILE EXISTS?", os.path.exists("multi_matchingL.csv"))
+print("FILES IN DIR:", os.listdir())
+
