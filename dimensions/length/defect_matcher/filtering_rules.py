@@ -7,6 +7,8 @@
 # Meaning: One predicted defect matches exactly one reference defect (no ambiguity).
 # Action: Assign ref_id to test_id and mark ref_flag[ref_id] = 1 to prevent reuse.
 # Purpose: High-confidence direct assignment without conflict resolution.
+import pandas as pd
+
 
 def rule_one_single_block(out_df, info, ref_flag):
     flags_updated = 0
@@ -197,6 +199,66 @@ def rule_four_single_block(out_df, info, ref_flag):
         if not assigned:
             out_df.loc[out_df["id"] == tid, "filtered_ids_new"] = 0
             print(f"RULE4 CASE2 NO REF AVAILABLE FOR TEST_ID {tid}")
+
+    # ================= POST RULE-4 DISTANCE SANITY CHECK ================= #
+
+    print("\n[RULE4 SANITY CHECK] Starting distance consistency validation")
+
+    ref_dist_map = info["ref_dist_map"]
+
+    # sort block test IDs by test distance
+    sorted_test_ids = sorted(test_ids, key=lambda t: distances[t])
+
+    print(f"[SANITY] Sorted TEST IDs: {sorted_test_ids}")
+    print(f"[SANITY] TEST distances: { {tid: distances[tid] for tid in sorted_test_ids} }")
+
+    for i in range(len(sorted_test_ids) - 1):
+        t1 = sorted_test_ids[i]
+        t2 = sorted_test_ids[i + 1]
+
+        r1 = out_df.loc[out_df["id"] == t1, "filtered_ids_new"].values[0]
+        r2 = out_df.loc[out_df["id"] == t2, "filtered_ids_new"].values[0]
+
+        print(f"\n[SANITY] Checking TEST pair ({t1}, {t2})")
+        print(f"         Assigned REFs: {r1}, {r2}")
+
+        # skip unassigned
+        if r1 == 0 or r2 == 0 or pd.isna(r1) or pd.isna(r2):
+            print("         -> SKIP (unassigned)")
+            continue
+
+        test_gap = abs(distances[t2] - distances[t1])
+        ref_gap  = abs(ref_dist_map[int(r2)] - ref_dist_map[int(r1)])
+
+        print(f"         TEST distances: {distances[t1]} , {distances[t2]}")
+        print(f"         REF distances : {ref_dist_map[int(r1)]} , {ref_dist_map[int(r2)]}")
+        print(f"         ΔTEST = {test_gap} mm | ΔREF = {ref_gap} mm")
+
+        # YOUR STRICT RULE
+        if test_gap < ref_gap:
+            print("         ❌ VIOLATION: ΔTEST < ΔREF → SELECTIVE RESET")
+
+            # Decide which ref to keep (smaller ref_id = more upstream)
+            if int(r1) < int(r2):
+                drop_tid = t2
+                drop_ref = r2
+                keep_tid = t1
+                keep_ref = r1
+            else:
+                drop_tid = t1
+                drop_ref = r1
+                keep_tid = t2
+                keep_ref = r2
+
+            print(f"         KEEP  TEST_ID={keep_tid} REF={keep_ref}")
+            print(f"         DROP  TEST_ID={drop_tid} REF={drop_ref}")
+
+            # Reset the worse assignment
+            out_df.loc[out_df["id"] == drop_tid, "filtered_ids_new"] = 0
+
+            # Free the reference flag
+            ref_flag[int(drop_ref)] = 0
+
 
     return out_df, ref_flag, flags_updated
 

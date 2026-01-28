@@ -16,7 +16,7 @@ from dimensions.length.defect_matcher.filtering_rules import filtered_ids_new_ma
 REF_FILE  = r"D:\Anubhav\machine_learning_pipelines\resources\12inch_7.1mm.csv"
 
 # SINGLE MODE FILE
-TEST_FILE = r"D:\Anubhav\machine_learning_pipelines\resources\results\12\bbnew_results\PTT_2_RESULTS.csv"
+TEST_FILE = r"D:\Anubhav\machine_learning_pipelines\resources\results\12\bbnew_results\PTT_1_RESULTS.csv"
 
 # BATCH MODE FOLDER
 TEST_FOLDER = r"D:\Anubhav\machine_learning_pipelines\resources\results\12\bbnew_results"
@@ -33,7 +33,7 @@ TEST_ID_COL   = "id"
 TEST_DIST_COL = "absolute_distance"
 TEST_ORI_COL  = "orientation"
 
-DIST_THRESHOLD_MM = 110
+DIST_THRESHOLD_MM = 135
 ORI_THRESHOLD_MIN = 80
 border_threshold_limit = 10
 
@@ -41,6 +41,8 @@ TEST_DISTANCE_IN_METERS = True
 REF_DISTANCE_IN_METERS  = False
 
 length_threshold = 11
+
+
 # ===== BATCH SUMMARY STORAGE =====
 batch_summary = []
 
@@ -128,6 +130,8 @@ def process_test_file(TEST_FILE):
 
     test["dist_mm"] = test[TEST_DIST_COL] * 1000 if TEST_DISTANCE_IN_METERS else test[TEST_DIST_COL]
     ref["dist_mm"]  = ref[REF_DIST_COL]  * 1000 if REF_DISTANCE_IN_METERS  else ref[REF_DIST_COL]
+    # After computing ref["dist_mm"]
+    ref_dist_map = dict(zip(ref["S.No"].astype(int), ref["dist_mm"]))
 
     # Clean
     test = test.dropna(subset=["dist_mm"])
@@ -213,7 +217,8 @@ def process_test_file(TEST_FILE):
             "ref_ids": ref_list,
             "test_ids": test_ids,
             "pred_length": pred_len_map,
-            "actual_length": actual_len_map
+            "actual_length": actual_len_map,
+            "ref_dist_map": ref_dist_map
         }
     print(f"final block list for ptt {ptt_name} : {final_block_stats}")
 
@@ -263,12 +268,11 @@ def process_test_file(TEST_FILE):
         "id",
         "distance_mm",
         "orientation",
-        "actual_length",
         "ref_ids_all",
         "ref_lengths_all",
         "filtered_ids_new",
-        "pred_length",
         "actual_length_filtered",
+        "pred_length",
         "length_diff",
         "correct",
         "summary_value",
@@ -321,7 +325,7 @@ if __name__ == "__main__":
         # ===== SAVE GLOBAL BATCH SUMMARY =====
         summary_df = pd.DataFrame(batch_summary)
 
-        summary_save_path = os.path.join(os.getcwd(), "defect_match", "PTT_BATCH_SUMMARY.csv")
+        summary_save_path = os.path.join(os.getcwd(), "defect_match", f"PTT_SUMMARY_length_threshold={length_threshold}.csv")
         summary_df.to_csv(summary_save_path, index=False)
 
         print("\n[BATCH SUMMARY SAVED] →", summary_save_path)
