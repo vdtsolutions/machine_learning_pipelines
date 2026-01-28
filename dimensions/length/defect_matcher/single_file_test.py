@@ -1,11 +1,17 @@
+import re
+
 import pandas as pd
 import numpy as np
-from dimensions.length.filtered_id_new_maker import filtered_ids_new_maker
+
 
 # ================= CONFIG ================= #
+from dimensions.length.defect_matcher.filtering_rules import filtered_ids_new_maker
 
 REF_FILE  = r"D:\Anubhav\machine_learning_pipelines\resources\12inch_7.1mm.csv"
 TEST_FILE = r"D:\Anubhav\machine_learning_pipelines\resources\results\12\bbnew_results\PTT_2_RESULTS.csv"
+ptt_name = re.search(r"(PTT_\d+)", TEST_FILE).group(1)
+print(ptt_name)  # PTT_2
+
 
 REF_ID_COL   = "S.No"
 REF_DIST_COL = "absolute_distance"
@@ -165,8 +171,14 @@ keep_cols = [
     "ref_lengths_all",
     "filtered_ids_new"
 ]
+import os
 
-out_df[keep_cols].to_csv("filtered_output_clean_ptt_2.csv", index=False)
+# folder in the directory where you run the script from
+save_dir = os.path.join(os.getcwd(), "defect_match")
+os.makedirs(save_dir, exist_ok=True)
+
+save_path = os.path.join(save_dir, f"results_matching_{ptt_name}.csv")
+out_df[keep_cols].to_csv(save_path, index=False)
 
 print("\nSaved → filtered_output_clean.csv")
 print("Total test defects:", len(out_df))
