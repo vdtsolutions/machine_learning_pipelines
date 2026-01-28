@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 
 # ================= CONFIG ================= #
+from dimensions.length.filtered_id_new_maker import filtered_ids_new_maker
 
 REF_FILE  = r"D:\Anubhav\machine_learning_pipelines\resources\12inch_7.1mm.csv"
 TEST_FILE = r"D:\Anubhav\machine_learning_pipelines\resources\results\12\bbnew_results\PTT_1_RESULTS.csv"
@@ -232,6 +233,90 @@ for tid, logs in assign_log.items():
 out_df["ref_ids_norm"] = out_df["ref_ids_all"].astype(str).apply(
     lambda x: ",".join(sorted(x.split(",")))
 )
+# ================= REF IDS NORM COUNT ================= #
+print("\n================ REF BLOCK FULL STATS ================\n")
+
+# Remove empty blocks
+df_clean = out_df[out_df["ref_ids_norm"] != ""].copy()
+
+# Group test IDs per block
+block_id_map = df_clean.groupby("ref_ids_norm")["id"].apply(list).to_dict()
+
+
+# Sorting helper
+def sort_key(x):
+    return int(x.split(",")[0])
+
+
+ref_len_map = dict(zip(ref["S.No"], ref["length"]))
+
+final_block_stats = {}
+
+for block in sorted(block_id_map.keys(), key=sort_key):
+    test_ids = block_id_map[block]
+    ref_list = [int(x) for x in block.split(",")]
+
+    # pred length per test_id
+    pred_len_map = {}
+    for tid in test_ids:
+        pred_len_map[tid] = out_df.loc[out_df["id"] == tid, "pred_length"].values[0]
+
+    # actual length per test_id
+    actual_len_map = {}
+    for tid in test_ids:
+        if len(ref_list) == 1:
+            # SINGLE REF → store scalar
+            rid = ref_list[0]
+            actual_len_map[tid] = ref_len_map.get(rid, np.nan)
+        else:
+            # MULTI REF → store list
+            actual_len_map[tid] = [ref_len_map.get(r, np.nan) for r in ref_list]
+
+    final_block_stats[block] = {
+        "count_test_ids": len(test_ids),
+        "block_size_ref_ids": len(ref_list),
+        "ref_ids": ref_list,
+        "test_ids": test_ids,
+        "pred_length": pred_len_map,
+        "actual_length": actual_len_map
+    }
+
+print("\n" + "="*120)
+print(f"{'BLOCK':<12} | {'REF_IDS':<15} | {'BLOCK_SIZE':<10} | {'TEST_ID':<8} | {'PRED_LEN':<10} | {'ACTUAL_LEN':<20}")
+print("="*120)
+
+for block, info in final_block_stats.items():
+    ref_ids_str = str(info["ref_ids"])
+    block_size  = info["block_size_ref_ids"]
+
+    for tid in info["test_ids"]:
+        pred_len   = info["pred_length"][tid]
+        actual_len = info["actual_length"][tid]
+
+        # Convert actual_len to string safely
+        actual_len_str = str(actual_len)
+
+        print(f"{block:<12} | {ref_ids_str:<15} | {block_size:^10} | {tid:^8} | {str(pred_len):<10} | {actual_len_str:<20}")
+
+print("="*120)
+print(f"final stat dict raw: {final_block_stats}")
+print("\nFINAL BLOCK STATS DICT (LINE BY LINE):\n")
+
+for block, info in final_block_stats.items():
+    print(f"\nBLOCK: {block}")
+    for k, v in info.items():
+        print(f"   {k}: {v}")
+
+
+# NEW COLUMN FOR EXPERIMENT
+max_ref_id = ref["S.No"].max()
+print(f"max ref id calculated from ref csv: {max_ref_id}")
+out_df["filtered_ids_new"] = np.nan
+out_df, ref_flag = filtered_ids_new_maker(out_df, final_block_stats, max_ref_id)
+
+
+
+
 
 DIST_TOL = 5
 
