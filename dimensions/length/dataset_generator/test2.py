@@ -24,7 +24,7 @@ MATCH_BASE     = r"D:\Anubhav\machine_learning_pipelines\dimensions\length\defec
 RESULTS_BASE   = r"D:\Anubhav\machine_learning_pipelines\resources\results\12\bbnew_results"
 
 PTTS = [1,2,3,4,5,6,7,8]
-OUTPUT_CSV = "MASTER_ML_DATASET.csv"
+OUTPUT_CSV = "MASTER_ML_DATASET_V2.csv"
 
 # ================= PIPE METADATA =================
 PIPE_OD_MM = 324
@@ -62,7 +62,7 @@ def fft_features(signal):
     return {
         "fft_peak_freq": float(freqs[peak_idx]),
         "fft_peak_mag": float(fft_vals[peak_idx]),
-        "fft_energy": float(np.sum(fft_vals**2) / len(sig))   # normalized
+        "fft_energy": float(np.sum(fft_vals**2) / len(sig))
     }
 
 # ---------- CWT ----------
@@ -107,7 +107,7 @@ def extract_submatrix_features(path):
     axial_signal = mat.mean(axis=1)
     original_len = len(axial_signal)
 
-    # -------- Axial span (FIXED AXIS BUG) --------
+    # -------- Axial span (correct axis) --------
     axial_active = np.any(mat > np.percentile(mat, 50), axis=1)
     axial_span = int(np.sum(axial_active))
 
@@ -170,7 +170,6 @@ def extract_submatrix_features(path):
 all_rows = []
 
 # ================= LOOP ALL PTTs =================
-
 for ptt in PTTS:
     print(f"\n========== PROCESSING PTT {ptt} ==========")
 
@@ -203,13 +202,17 @@ for ptt in PTTS:
     df = match_df.merge(results_df, on="id", how="left")
     df["correct"] = df[LABEL_COL].map({"YES": 1, "NO": 0})
 
+    # ================= ADD AXIAL INDEX SPAN =================
+    df["axial_index_span"] = df["end_index"] - df["start_index"]
+
     print(df["correct"].value_counts())
 
     # Loop defects
     for _, row in df.iterrows():
         defect_id = int(row["id"])
 
-        files = [f for f in os.listdir(submat_dir) if f.startswith(f"submatrix_ptt-{ptt}({defect_id},")]
+        files = [f for f in os.listdir(submat_dir)
+                 if f.startswith(f"submatrix_ptt-{ptt}({defect_id},")]
         if not files:
             continue
 
@@ -241,6 +244,7 @@ for ptt in PTTS:
             # PTT results meta
             "start_index": row.get("start_index", np.nan),
             "end_index": row.get("end_index", np.nan),
+            "axial_index_span": row.get("axial_index_span", np.nan),   # <<< NEW FEATURE
             "start_sensor": row.get("start_sensor", np.nan),
             "end_sensor": row.get("end_sensor", np.nan),
             "absolute_distance": row.get("absolute_distance", np.nan),
@@ -258,7 +262,7 @@ for ptt in PTTS:
             "correct": row["correct"]
         })
 
-# Save dataset
+# ================= SAVE DATASET =================
 master_df = pd.DataFrame(all_rows)
 master_df.to_csv(OUTPUT_CSV, index=False)
 
