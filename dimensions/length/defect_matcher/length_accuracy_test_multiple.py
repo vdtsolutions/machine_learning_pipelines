@@ -33,7 +33,8 @@ TEST_ID_COL   = "id"
 TEST_DIST_COL = "absolute_distance"
 TEST_ORI_COL  = "orientation"
 
-DIST_THRESHOLD_MM = 135
+DIST_THRESHOLD_MM = 110
+border_distance_limit = 15
 ORI_THRESHOLD_MIN = 80
 border_threshold_limit = 10
 

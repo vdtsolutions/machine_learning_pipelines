@@ -226,6 +226,7 @@ def rule_four_single_block(out_df, info, ref_flag):
         if r1 == 0 or r2 == 0 or pd.isna(r1) or pd.isna(r2):
             print("         -> SKIP (unassigned)")
             continue
+        TOL = 0.05          #% for threshold for checking distance
 
         test_gap = abs(distances[t2] - distances[t1])
         ref_gap  = abs(ref_dist_map[int(r2)] - ref_dist_map[int(r1)])
@@ -235,7 +236,9 @@ def rule_four_single_block(out_df, info, ref_flag):
         print(f"         ΔTEST = {test_gap} mm | ΔREF = {ref_gap} mm")
 
         # YOUR STRICT RULE
-        if test_gap < ref_gap:
+        # if test_gap < ref_gap:
+        # Only violation if TEST gap is significantly smaller (not noise)
+        if test_gap < ref_gap * (1 - TOL):
             print("         ❌ VIOLATION: ΔTEST < ΔREF → SELECTIVE RESET")
 
             # Decide which ref to keep (smaller ref_id = more upstream)
