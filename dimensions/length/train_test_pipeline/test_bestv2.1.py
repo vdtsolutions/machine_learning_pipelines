@@ -55,9 +55,9 @@ y_train = train_df["true_length"] - train_df["pred_length"]
 
 # ================= TRAIN MODEL =================
 reg = XGBRegressor(
-    n_estimators=1600,
+    n_estimators=1500,
     max_depth=15,
-    learning_rate=0.01,
+    learning_rate=0.02,
     subsample=0.9,
     colsample_bytree=0.9,
     random_state=42
