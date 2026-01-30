@@ -6,7 +6,7 @@ from sklearn.metrics import mean_absolute_error, r2_score, confusion_matrix, cla
 # ================= CONFIG =================
 MAX_SENSOR_COUNT = 144
 OUTLIER_THRESHOLD_RATIO = 0.6
-TOL_MM = 11
+TOL_MM = 12
 
 # ================= LOAD DATA =================
 df = pd.read_csv(r"D:\Anubhav\machine_learning_pipelines\dimensions\length\dataset_generator\MASTER_ML_DATASET_V2.csv")
@@ -22,7 +22,7 @@ df["axial_index_span"] = df["end_index"] - df["start_index"]
 
 print("\n================ DATA SUMMARY ================")
 print("Total rows:", len(df))
-print("Total outliers:", df["outlier"].sum())
+print("Total outliers based on sensors spans :", df["outlier"].sum())
 
 # ================= FEATURES =================
 FEATURES = [
@@ -56,8 +56,8 @@ y_train = train_df["true_length"] - train_df["pred_length"]
 # ================= TRAIN MODEL =================
 reg = XGBRegressor(
     n_estimators=1500,
-    max_depth=15,
-    learning_rate=0.02,
+    max_depth=7,
+    learning_rate=0.05,
     subsample=0.9,
     colsample_bytree=0.9,
     random_state=42
