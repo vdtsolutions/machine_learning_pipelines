@@ -8,7 +8,7 @@ import numpy as np
 from dimensions.length.defect_matcher.filtering_rules import filtered_ids_new_maker
 
 REF_FILE  = r"D:\Anubhav\machine_learning_pipelines\resources\12inch_7.1mm.csv"
-TEST_FILE = r"D:\Anubhav\machine_learning_pipelines\resources\results\12\bbnew_results\PTT_2_RESULTS.csv"
+TEST_FILE = r"D:\Anubhav\machine_learning_pipelines\resources\results\12\bbnew_results\PTT_1_RESULTS.csv"
 ptt_name = re.search(r"(PTT_\d+)", TEST_FILE).group(1)
 print(ptt_name)  # PTT_2
 
@@ -22,8 +22,10 @@ TEST_DIST_COL = "absolute_distance"
 TEST_ORI_COL  = "orientation"
 
 DIST_THRESHOLD_MM = 110
+border_distance_threshold = 20
+
 ORI_THRESHOLD_MIN = 80
-border_threshold_limit = 10
+border_threshold_limit = 5
 
 TEST_DISTANCE_IN_METERS = True
 REF_DISTANCE_IN_METERS  = False
@@ -85,7 +87,7 @@ for _, t in test.iterrows():
 
     for _, r in ref.iterrows():
         dist_diff = abs(r["dist_mm"] - t["dist_mm"])
-        dist_pass = dist_diff <= DIST_THRESHOLD_MM
+        dist_pass = dist_diff <= DIST_THRESHOLD_MM + border_distance_threshold
 
         ori_pass = True
         if not np.isnan(r["ori_min"]) and not np.isnan(t["ori_min"]):
@@ -177,7 +179,7 @@ import os
 save_dir = os.path.join(os.getcwd(), "defect_match")
 os.makedirs(save_dir, exist_ok=True)
 
-save_path = os.path.join(save_dir, f"results_matching_{ptt_name}.csv")
+save_path = os.path.join(save_dir, f"results_matching_new_{ptt_name}.csv")
 out_df[keep_cols].to_csv(save_path, index=False)
 
 print("\nSaved → filtered_output_clean.csv")

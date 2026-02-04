@@ -279,10 +279,10 @@ def process_test_file(TEST_FILE):
         "summary_value",
     ]
 
-    save_dir = os.path.join(os.getcwd(), "defect_match_2026_data")
+    save_dir = os.path.join(os.getcwd(), "defect_match_length_data")
     os.makedirs(save_dir, exist_ok=True)
 
-    save_path = os.path.join(save_dir, f"results_matching_{ptt_name}.csv")
+    save_path = os.path.join(save_dir, f"results_matching_length_{ptt_name}.csv")
 
 
     # summary rows with label + value in separate columns
@@ -326,7 +326,7 @@ if __name__ == "__main__":
         # ===== SAVE GLOBAL BATCH SUMMARY =====
         summary_df = pd.DataFrame(batch_summary)
 
-        summary_save_path = os.path.join(os.getcwd(), "defect_match", f"PTT_SUMMARY_length_threshold={length_threshold}.csv")
+        summary_save_path = os.path.join(os.getcwd(), "defect_match_length_data", f"PTT_SUMMARY_length_threshold={length_threshold}.csv")
         summary_df.to_csv(summary_save_path, index=False)
 
         print("\n[BATCH SUMMARY SAVED] →", summary_save_path)
