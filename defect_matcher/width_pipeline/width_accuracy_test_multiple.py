@@ -11,13 +11,14 @@ import numpy as np
 # ================= CONFIG ================= #
 from defect_matcher.width_pipeline.filtering_rules_width import filtered_ids_new_maker
 
-REF_FILE  = r"D:\Anubhav\machine_learning_pipelines\resources\12inch_7.1mm.csv"
+# REF_FILE  = r"D:\Anubhav\machine_learning_pipelines\resources\12inch_7.1mm.csv"
+REF_FILE = r"D:\Anubhav\machine_learning_pipelines\resources\12_inch_5.5mm.csv"
 
 # SINGLE MODE FILE
 TEST_FILE = r"D:\Anubhav\machine_learning_pipelines\resources\results\12\bbnew_results\PTT_1_RESULTS.csv"
 
 # BATCH MODE FOLDER
-TEST_FOLDER = r"D:\Anubhav\machine_learning_pipelines\resources\results\12\bbnew_results"
+TEST_FOLDER = r"D:\Anubhav\testing_bbnew"
 
 RUN_MODE = "batch"   # "single" or "batch"
 

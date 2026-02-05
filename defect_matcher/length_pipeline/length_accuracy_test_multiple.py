@@ -13,13 +13,13 @@ import numpy as np
 # ================= CONFIG ================= #
 from dimensions.length.defect_matcher.filtering_rules import filtered_ids_new_maker
 
-REF_FILE  = r"D:\Anubhav\machine_learning_pipelines\resources\12inch_7.1mm.csv"
+REF_FILE  = r"D:\Anubhav\machine_learning_pipelines\resources\12_inch_5.5mm.csv"
 
 # SINGLE MODE FILE
 TEST_FILE = r"D:\Anubhav\machine_learning_pipelines\resources\results\12\bbnew_results\PTT_1_RESULTS.csv"
 
 # BATCH MODE FOLDER
-TEST_FOLDER = r"D:\Anubhav\machine_learning_pipelines\resources\results\12\bbnew_results"
+TEST_FOLDER = r"D:\Anubhav\testing_bbnew"
 
 RUN_MODE = "batch"   # "single" or "batch"
 
@@ -41,7 +41,7 @@ border_threshold_limit = 5
 TEST_DISTANCE_IN_METERS = True
 REF_DISTANCE_IN_METERS  = False
 
-length_threshold = 10
+length_threshold = 13
 
 
 # ===== BATCH SUMMARY STORAGE =====

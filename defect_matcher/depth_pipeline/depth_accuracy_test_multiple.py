@@ -11,13 +11,13 @@ import numpy as np
 # ================= CONFIG ================= #
 from defect_matcher.depth_pipeline.filtering_rules_depth import filtered_ids_new_maker
 
-REF_FILE  = r"D:\Anubhav\machine_learning_pipelines\resources\12inch_7.1mm.csv"
+REF_FILE  = r"D:\Anubhav\machine_learning_pipelines\resources\12_inch_5.5mm.csv"
 
 # SINGLE MODE FILE
 TEST_FILE = r"D:\Anubhav\machine_learning_pipelines\resources\results\12\bbnew_results\PTT_1_RESULTS.csv"
 
 # BATCH MODE FOLDER
-TEST_FOLDER = r"D:\Anubhav\machine_learning_pipelines\resources\results\12\bbnew_results"
+TEST_FOLDER = r"D:\Anubhav\testing_bbnew"
 
 RUN_MODE = "batch"   # "single" or "batch"
 
@@ -34,7 +34,7 @@ TEST_ORI_COL  = "orientation"
 DIST_THRESHOLD_MM = 110
 border_distance_limit = 20
 ORI_THRESHOLD_MIN = 80
-border_threshold_limit = 5
+border_threshold_limit = -10
 
 TEST_DISTANCE_IN_METERS = True
 REF_DISTANCE_IN_METERS  = False
@@ -58,7 +58,7 @@ def orientation_to_minutes(x):
     except:
         return np.nan
 
-
+#add
 def circular_diff(a, b, max_val=720):
     return min(abs(a - b), max_val - abs(a - b))
 
